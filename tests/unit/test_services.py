@@ -76,7 +76,7 @@ async def test_require_owner_raises_404_when_not_found():
 
 
 @pytest.mark.asyncio
-async def test_require_owner_raises_403_when_not_owner():
+async def test_require_owner_raises_404_when_not_owner():
     from app.services.project_service import _require_owner
 
     row = _mock_row(owner_id="other-user")
@@ -85,7 +85,7 @@ async def test_require_owner_raises_403_when_not_owner():
 
     with pytest.raises(HTTPException) as exc_info:
         await _require_owner(conn, "proj-1", "user-1")
-    assert exc_info.value.status_code == 403
+    assert exc_info.value.status_code == 404
 
 
 @pytest.mark.asyncio

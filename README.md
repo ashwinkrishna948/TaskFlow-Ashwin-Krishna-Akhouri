@@ -232,12 +232,11 @@ curl http://localhost/healthz   # {"status": "ok"} — no auth required
 
 | Status | Meaning |
 |--------|---------|
-| 400 | Validation error — `{"detail": [{field-level errors}]}` |
+| 400 | Validation error — `{"detail": [{field-level errors}]}`. Covers body, query, and path parameter type errors (e.g. non-UUID project ID) |
 | 401 | Missing or invalid JWT |
 | 404 | Not found, or found but not accessible to you |
 | 409 | Email already registered |
 | 413 | Request body exceeds 1MB (rejected by nginx) |
-| 422 | Path/query parameter type error (e.g. non-UUID project ID) |
 | 429 | Rate limit exceeded |
 | 500 | Unhandled server error |
 

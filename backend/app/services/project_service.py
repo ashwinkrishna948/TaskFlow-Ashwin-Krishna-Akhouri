@@ -113,5 +113,5 @@ async def _require_owner(
     if not row:
         raise HTTPException(status_code=404, detail="not found")
     if str(row._mapping["owner_id"]) != user_id:
-        raise HTTPException(status_code=403, detail="forbidden")
+        raise HTTPException(status_code=404, detail="not found")
     return dict(row._mapping)

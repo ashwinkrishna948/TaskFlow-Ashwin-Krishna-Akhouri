@@ -92,10 +92,10 @@ def test_get_project_idor_returns_404(base_url, auth_headers):
     assert r.status_code == 404
 
 
-def test_get_project_invalid_uuid_returns_422(base_url, auth_headers):
+def test_get_project_invalid_uuid_returns_400(base_url, auth_headers):
     with httpx.Client(base_url=base_url, headers=auth_headers) as client:
         r = client.get("/projects/not-a-uuid")
-    assert r.status_code == 422
+    assert r.status_code == 400
 
 
 # ---------------------------------------------------------------------------
