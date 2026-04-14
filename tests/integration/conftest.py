@@ -36,19 +36,14 @@ def db_conn():
 
 @pytest.fixture(scope="session")
 def auth_token(base_url):
-    """Register a fresh user and return their JWT token."""
-    import uuid
-    email = f"integration_{uuid.uuid4().hex[:8]}@test.example"
+    """Login with the seeded test user and return their JWT token."""
     with httpx.Client(base_url=base_url) as client:
-        r = client.post("/auth/register", json={
-            "name": "Integration Tester",
-            "email": email,
-            "password": "IntTest123!",
+        r = client.post("/auth/login", json={
+            "email": "test@example.com",
+            "password": "password123",
         })
-        assert r.status_code == 201, f"Register failed: {r.text}"
-        r2 = client.post("/auth/login", json={"email": email, "password": "IntTest123!"})
-        assert r2.status_code == 200, f"Login failed: {r2.text}"
-        return r2.json()["access_token"]
+        assert r.status_code == 200, f"Login failed: {r.text}"
+        return r.json()["access_token"]
 
 
 @pytest.fixture(scope="session")
