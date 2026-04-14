@@ -1,0 +1,760 @@
+{
+  "info": {
+    "name": "TaskFlow API",
+    "_postman_id": "taskflow-collection",
+    "description": "Full API collection for TaskFlow.\n\n**Quick start:**\n1. Import this collection into Postman.\n2. Run **Auth / Login** — the token is saved automatically to `token`.\n3. Run **Projects / Create Project** — `project_id` is saved automatically.\n4. Run **Tasks / Create Task** — `task_id` is saved automatically.\n5. All other requests use those saved variables.\n\n**Base URL:** `http://localhost` (nginx on port 80). Change the `base_url` collection variable if running elsewhere.\n\n**Seed credentials:** `test@example.com` / `password123`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost",
+      "type": "string",
+      "description": "API base URL. Change if not running on localhost:80."
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "JWT access token. Set automatically by the Login request."
+    },
+    {
+      "key": "project_id",
+      "value": "",
+      "type": "string",
+      "description": "UUID of the current project. Set automatically by Create Project."
+    },
+    {
+      "key": "task_id",
+      "value": "",
+      "type": "string",
+      "description": "UUID of the current task. Set automatically by Create Task."
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Registration and login. Run Login first — it auto-saves the token used by all other requests.",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane@example.com\",\n    \"password\": \"Password123!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Create a new account. Returns the created user object.\n\n**Rate limit:** 5 requests/minute per IP."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane@example.com\",\n    \"password\": \"Password123!\"\n}"
+                },
+                "url": { "raw": "{{base_url}}/auth/register" }
+              },
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane@example.com\",\n    \"created_at\": \"2026-04-14T10:00:00Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('token', body.access_token);",
+                  "    console.log('Token saved. Expires in 24h.');",
+                  "    pm.test('Login successful', () => pm.response.to.have.status(200));",
+                  "    pm.test('access_token present', () => pm.expect(body.access_token).to.be.a('string'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Log in with email and password. The JWT is saved automatically to the `token` collection variable — all subsequent requests use it.\n\n**Seed credentials:** `test@example.com` / `password123`\n\n**Rate limit:** 10 requests/minute per IP."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"password123\"\n}"
+                },
+                "url": { "raw": "{{base_url}}/auth/login" }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n    \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"token_type\": \"bearer\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "description": "Project CRUD. All requests require a valid JWT in `token`.",
+      "item": [
+        {
+          "name": "List Projects",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects?page=1&page_size=20",
+              "host": ["{{base_url}}"],
+              "path": ["projects"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number (default 1)" },
+                { "key": "page_size", "value": "20", "description": "Results per page (max 100)" }
+              ]
+            },
+            "description": "Returns projects the current user owns or has an assigned task in. Supports pagination."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n    {\n        \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n        \"name\": \"Demo Project\",\n        \"description\": \"A sample project created by the seed script.\",\n        \"owner_id\": \"550e8400-e29b-41d4-a716-446655440001\",\n        \"created_at\": \"2026-04-14T10:00:00Z\"\n    }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Create Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('project_id', body.id);",
+                  "    console.log('project_id saved:', body.id);",
+                  "    pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "    pm.test('id is UUID', () => pm.expect(body.id).to.match(/^[0-9a-f-]{36}$/));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Website Redesign\",\n    \"description\": \"Q2 frontend overhaul\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/projects",
+              "host": ["{{base_url}}"],
+              "path": ["projects"]
+            },
+            "description": "Create a new project. The current user becomes the owner. `project_id` is saved automatically for use in subsequent requests."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"name\": \"Website Redesign\",\n    \"description\": \"Q2 frontend overhaul\",\n    \"owner_id\": \"550e8400-e29b-41d4-a716-446655440001\",\n    \"created_at\": \"2026-04-14T10:00:00Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('has tasks array', () => pm.expect(pm.response.json().tasks).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}"]
+            },
+            "description": "Get project details and all its live (non-deleted) tasks.\n\n**Auth rule:** owner or any user with an assigned task in this project. Returns 404 if you have no relationship to the project."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"name\": \"Website Redesign\",\n    \"description\": \"Q2 frontend overhaul\",\n    \"owner_id\": \"550e8400-e29b-41d4-a716-446655440001\",\n    \"created_at\": \"2026-04-14T10:00:00Z\",\n    \"tasks\": [\n        {\n            \"id\": \"550e8400-e29b-41d4-a716-446655440002\",\n            \"title\": \"Build login page\",\n            \"status\": \"todo\",\n            \"priority\": \"high\",\n            \"assignee_id\": null,\n            \"due_date\": null,\n            \"created_at\": \"2026-04-14T10:01:00Z\",\n            \"updated_at\": \"2026-04-14T10:01:00Z\"\n        }\n    ]\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n    \"detail\": \"not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('name updated', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.name).to.equal('Website Redesign — Updated');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Website Redesign — Updated\",\n    \"description\": \"Updated Q2 plan\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}"]
+            },
+            "description": "Update project name or description. **Owner only.** Non-owners receive 404."
+          }
+        },
+        {
+          "name": "Delete Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}"]
+            },
+            "description": "Delete project and cascade-delete all its tasks. **Owner only.** Returns 204 on success.\n\n⚠️ Running this will invalidate the saved `project_id`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "description": "Task CRUD. All task routes are nested under `/projects/:project_id/tasks`.",
+      "item": [
+        {
+          "name": "List Tasks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/tasks?page=1&page_size=20",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "tasks"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" },
+                { "key": "status", "value": "todo", "disabled": true, "description": "Filter by status: todo | in_progress | done" },
+                { "key": "assignee_id", "value": "", "disabled": true, "description": "Filter by assignee UUID" }
+              ]
+            },
+            "description": "List tasks in a project. Supports `?status=` and `?assignee_id=` filters. Pagination via `?page=&page_size=` (max 100)."
+          }
+        },
+        {
+          "name": "Create Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('task_id', body.id);",
+                  "    console.log('task_id saved:', body.id);",
+                  "    pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "    pm.test('title matches', () => pm.expect(body.title).to.equal('Build the login page'));",
+                  "    pm.test('status defaults to todo', () => pm.expect(body.status).to.equal('todo'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"Build the login page\",\n    \"description\": \"Implement JWT-based login with form validation\",\n    \"status\": \"todo\",\n    \"priority\": \"high\",\n    \"due_date\": \"2026-05-01\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/tasks",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "tasks"]
+            },
+            "description": "Create a task in the project. `task_id` is saved automatically.\n\n**Optional:** add `Idempotency-Key: <your-uuid>` header to make the request safely retryable — a duplicate request with the same key returns the original task."
+          }
+        },
+        {
+          "name": "Create Task (with Idempotency Key)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "my-unique-key-001", "description": "Retry this request safely — duplicate key returns the original task" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"Idempotent task\",\n    \"priority\": \"medium\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/tasks",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "tasks"]
+            },
+            "description": "Demonstrates idempotency. Send this request twice — the second returns the same task (same `id`). The key is scoped to your user: another user using the same key creates a separate task."
+          }
+        },
+        {
+          "name": "Get Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('id matches', () => {",
+                  "    pm.expect(pm.response.json().id).to.equal(pm.collectionVariables.get('task_id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/tasks/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "tasks", "{{task_id}}"]
+            },
+            "description": "Fetch a single task by ID."
+          }
+        },
+        {
+          "name": "Update Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('status updated', () => {",
+                  "    pm.expect(pm.response.json().status).to.equal('in_progress');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"in_progress\",\n    \"priority\": \"medium\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/tasks/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "tasks", "{{task_id}}"]
+            },
+            "description": "Update any task fields. Only include fields you want to change. All fields are optional.\n\n**Status machine:** `todo ↔ in_progress ↔ done`. All transitions are valid."
+          }
+        },
+        {
+          "name": "Delete Task (soft)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/tasks/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "tasks", "{{task_id}}"]
+            },
+            "description": "Soft-delete a task — sets `deleted_at`, does not destroy the row. Subsequent GET/PATCH on this task returns 404.\n\n**Auth:** project owner or the user who created the task."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error cases",
+      "description": "Requests that demonstrate error handling. Useful for verifying the API behaves correctly under bad inputs.",
+      "item": [
+        {
+          "name": "401 — No token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/projects",
+              "host": ["{{base_url}}"],
+              "path": ["projects"]
+            },
+            "description": "Accessing a protected endpoint without a token returns 401."
+          }
+        },
+        {
+          "name": "400 — Validation error (missing required field)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('detail present', () => pm.expect(pm.response.json().detail).to.exist);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/projects",
+              "host": ["{{base_url}}"],
+              "path": ["projects"]
+            },
+            "description": "POST /projects with empty body — missing required `name` field returns 400 with field-level errors."
+          }
+        },
+        {
+          "name": "400 — Field too long (501 chars)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{project_id}}/tasks",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "{{project_id}}", "tasks"]
+            },
+            "description": "Task title exceeds 500-character limit — Pydantic rejects before DB."
+          }
+        },
+        {
+          "name": "422 — Non-UUID path parameter",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422 Unprocessable', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/not-a-uuid",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "not-a-uuid"]
+            },
+            "description": "Non-UUID project ID returns 422 before any SQL runs."
+          }
+        },
+        {
+          "name": "404 — IDOR attempt (another user's resource)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 (not 403 — prevents existence leak)', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/projects/00000000-0000-0000-0000-000000000000",
+              "host": ["{{base_url}}"],
+              "path": ["projects", "00000000-0000-0000-0000-000000000000"]
+            },
+            "description": "Accessing a resource you don't own returns 404, not 403. This prevents an attacker from confirming the resource exists."
+          }
+        },
+        {
+          "name": "429 — Rate limit (login flood)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Send this request 11+ times in quick succession to trigger 429.",
+                  "// Use Postman Runner with iterations=15 to automate.",
+                  "const code = pm.response.code;",
+                  "pm.test('400/401 or 429', () => pm.expect([400, 401, 429]).to.include(code));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"bruteforce@notreal.com\",\n    \"password\": \"wrongpassword\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Trigger the rate limiter. Run via **Postman Runner** with 15 iterations and 0ms delay. Requests 11–15 should return 429."
+          }
+        },
+        {
+          "name": "405 — Wrong verb",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('405 Method Not Allowed', () => pm.response.to.have.status(405));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "DELETE /auth/login is not a registered route — returns 405."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ops",
+      "item": [
+        {
+          "name": "Health check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('status ok', () => pm.expect(pm.response.json().status).to.equal('ok'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/healthz",
+              "host": ["{{base_url}}"],
+              "path": ["healthz"]
+            },
+            "description": "Liveness probe. No auth required. Used by nginx to health-check API instances."
+          }
+        }
+      ]
+    }
+  ]
+}

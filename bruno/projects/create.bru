@@ -1,0 +1,28 @@
+meta {
+  name: Create Project
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/projects
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "My New Project",
+    "description": "A project created via Bruno"
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setEnvVar("project_id", res.body.id);
+  }
+}

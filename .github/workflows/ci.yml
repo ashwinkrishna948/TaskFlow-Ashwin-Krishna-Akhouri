@@ -1,0 +1,176 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build and push the FastAPI backend image
+  # ---------------------------------------------------------------------------
+  build-api:
+    name: Build API image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/api
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Build and push the PgBouncer image
+  # ---------------------------------------------------------------------------
+  build-pgbouncer:
+    name: Build PgBouncer image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/pgbouncer
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./pgbouncer
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Unit tests — no stack required, run against mocked dependencies
+  # ---------------------------------------------------------------------------
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt pytest pytest-asyncio
+
+      - name: Run unit tests
+        env:
+          JWT_SECRET: test-secret-for-unit-tests
+        run: pytest tests/unit -v
+
+  # ---------------------------------------------------------------------------
+  # Integration tests — runs against a live stack
+  # ---------------------------------------------------------------------------
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs: [build-api, build-pgbouncer]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install httpx pytest pytest-asyncio psycopg2-binary
+
+      - name: Copy env file
+        run: cp .env.example .env
+
+      - name: Start stack
+        run: docker compose up --build -d
+        timeout-minutes: 3
+
+      - name: Wait for API to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost/healthz; then
+              echo "API is up"
+              exit 0
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 3
+          done
+          echo "API did not become healthy in time"
+          docker compose logs api
+          exit 1
+
+      - name: Run integration tests
+        env:
+          BASE_URL: http://localhost
+          DATABASE_URL: postgresql://taskflow:taskflow_secret@localhost:5432/taskflow
+        run: pytest tests/integration -v
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs --tail=100

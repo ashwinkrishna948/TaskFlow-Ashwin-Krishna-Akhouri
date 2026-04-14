@@ -1,0 +1,30 @@
+meta {
+  name: Create Task
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/projects/{{project_id}}/tasks
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "title": "Build the login page",
+    "description": "Implement JWT-based login",
+    "status": "todo",
+    "priority": "high"
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setEnvVar("task_id", res.body.id);
+  }
+}

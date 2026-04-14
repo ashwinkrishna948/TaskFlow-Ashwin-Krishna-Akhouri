@@ -1,0 +1,22 @@
+meta {
+  name: Update Project
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{base_url}}/projects/{{project_id}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Renamed Project",
+    "description": "Updated description"
+  }
+}

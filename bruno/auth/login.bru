@@ -1,0 +1,25 @@
+meta {
+  name: Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "test@example.com",
+    "password": "password123"
+  }
+}
+
+script:post-response {
+  // Save token to environment after login so other requests pick it up
+  if (res.status === 200) {
+    bru.setEnvVar("token", res.body.access_token);
+  }
+}
